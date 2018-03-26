@@ -2,7 +2,7 @@
 ~~~~~~~~~~~~~~
 Written by Yong Yu Wen, 2018
 
-(Built using tensorflow-gpu 1.6.0, cuda 9.0 and cuDNN 7.05)
+(Built using tensorflow-gpu 1.6.0)
 
 A TensorFlow-based many-to-one recurrent neural network specifically
 for the classification of MBTI types based on social media posts.
