@@ -3,7 +3,7 @@ import pickle
 import tensorflow as tf
 
 #Load data
-data, embedding = pickle.load( open( "256.p", "rb" ) )
+data, embedding = pickle.load( open( "../data/256.p", "rb" ) )
 training_data, validation_data = data
 
 num_steps = len(training_data[0][0])
