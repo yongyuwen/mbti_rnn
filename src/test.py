@@ -17,9 +17,9 @@ save="./saves/LSTM_BatchSize96_DropOutHalf"
 pipeline = data_pipeline(batch_size=64, shuffle_buffer_size=100000)
 
 #Create network
-net = RNN('GRU', state_size=427, num_steps=num_steps, num_layers=1, num_classes=num_classes, embedding=embedding, build_with_dropout=True, dropout=0.3)
+net = RNN('GRU', state_size=427, num_steps=num_steps, num_layers=1, num_classes=num_classes, embedding=embedding, build_with_dropout=True)
 
 #Train the model
 with tf.Session() as sess:
     net.train(sess, epochs=epochs, learning_rate= 3e-4, pipeline=pipeline, training_data=training_data, validation_data=validation_data,
-              checkpoint=checkpoint, save=None)
+              dropout=0.3, checkpoint=checkpoint, save=None)
