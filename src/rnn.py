@@ -23,7 +23,7 @@ import pickle
 
 class RNN(object):
     def __init__(self, cell_type, state_size, num_steps, num_layers,
-                 num_classes, embedding=None, build_with_dropout=False, dropout=1.0):
+                 num_classes, embedding=None, build_with_dropout=False):
         """
         Creates the RNN object
         :param cell_type: Type of RNN cell. Supports Basic RNN, GRUs and LSTMs
@@ -45,7 +45,7 @@ class RNN(object):
         self.num_layers = num_layers
         self.num_classes = num_classes
         self.build_with_dropout = build_with_dropout
-        self.dropout = dropout
+        self.dropout = tf.placeholder_with_default(tf.constant(1.0, dtype=tf.float32), ())
         self.cell_type = cell_type
         self.cell = self._make_MultiRNNCell()
         self.saver = tf.train.Saver()
@@ -77,7 +77,7 @@ class RNN(object):
 
 
     def train(self, sess, epochs, learning_rate, pipeline, training_data, validation_data,
-              checkpoint=None, save=None):
+              dropout=1.0, checkpoint=None, save=None):
         """
         Trains the neural network using the Adam Optimizer (by default)
         :param sess: TensorFlow Session
@@ -140,7 +140,8 @@ class RNN(object):
                 try:
                     steps += 1
                     batch_x, batch_y = sess.run(pipeline.next_element_train)
-                    feed_dict={self.x: batch_x, self.y: batch_y}
+                    feed_dict={self.x: batch_x, self.y: batch_y,
+                               self.dropout: dropout}
 
                     training_loss_, _, accuracy = sess.run([total_loss,
                                                             train_step,
