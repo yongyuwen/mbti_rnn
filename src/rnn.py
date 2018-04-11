@@ -33,7 +33,6 @@ class RNN(object):
         :param num_classes: Number of classes in the output
         :param embedding: Word embedding
         :param build_with_dropout: Whether to use dropout in the RNN
-        :param dropout: Dropout keep probability
         """
         self.x = tf.placeholder(tf.int32, [None, num_steps], name='input_placeholder')
         self.y = tf.placeholder(tf.int32, [None, num_classes], name='labels_placeholder')
@@ -77,7 +76,7 @@ class RNN(object):
 
 
     def train(self, sess, epochs, learning_rate, pipeline, training_data, validation_data,
-              dropout=1.0, checkpoint=None, save=None):
+              SGDR=False, store_accuracies = False, dropout=1.0, checkpoint=None, save=None):
         """
         Trains the neural network using the Adam Optimizer (by default)
         :param sess: TensorFlow Session
@@ -86,9 +85,16 @@ class RNN(object):
         :param pipeline: Pipeline object to feed data into the network for training
         :param training_data: Training dataset (in Numpy array format, labels one-hot encoded)
         :param validation_data: Validation dataset (in Numpy array format, labels one-hot encoded)
+        :param SGDR: Stochastic Gradient Descent with Restarts. See https://arxiv.org/abs/1608.03983
+        :param store_accuracies: Save & store train and validation accuracies to be exported
+        :param dropout: Dropout keep probability (1.0 for no dropout)
         :param checkpoint: Location to save model checkpoint
         :param save: Location to save trained model
         """
+        #~~Read data
+        training_x, training_y = training_data
+        validation_x, validation_y = validation_data
+        
         rnn_inputs = tf.nn.embedding_lookup(self.embeddings, self.x)
         rnn_outputs, final_state = tf.nn.dynamic_rnn(self.cell, rnn_inputs, dtype=tf.float32) #initial_state=init_state
         with tf.variable_scope('softmax'):
@@ -100,6 +106,16 @@ class RNN(object):
 
         y_reshaped = tf.reshape(self.y, [-1, self.num_classes])
         total_loss = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits_v2(logits=predictions, labels=y_reshaped))
+
+        #Create Global step
+        global_step = tf.Variable(0, trainable=False, name='global_step')
+
+        #SGDR
+        if SGDR:
+            first_decay_steps = int(training_x.shape[0]/pipeline.batch_size)
+            learning_rate = tf.train.cosine_decay_restarts(learning_rate, global_step,
+                                                           first_decay_steps)
+
         train_step = tf.train.AdamOptimizer(learning_rate).minimize(total_loss)
 
         #model evaluation
@@ -107,8 +123,7 @@ class RNN(object):
         model_accuracy=tf.reduce_mean(tf.cast(correct_prediction,tf.float32))
 
         #~~~~~~~~~~~~~~Training of the actual dataset~~~~~~~~~~~~~~~~~~
-        training_x, training_y = training_data
-        validation_x, validation_y = validation_data
+        
 
         sess.run(tf.global_variables_initializer())
 
@@ -157,8 +172,9 @@ class RNN(object):
                 except tf.errors.OutOfRangeError:
                     print("End of training dataset.")
                     print("Avg accuracy for Epoch {} step {} =".format(epoch, steps), tf.reduce_mean(accuracies).eval())
-                    training_accuracies.append(tf.reduce_mean(accuracies).eval())
-                    accuracies = []
+                    if store_accuracies:
+                        training_accuracies.append(tf.reduce_mean(accuracies).eval())
+                        accuracies = []
                     break
 
             #Print Validation Accuracy per Epoch
@@ -173,14 +189,16 @@ class RNN(object):
                     val_accuracies.append(accuracy)
                 except tf.errors.OutOfRangeError:
                     print("Validation Accuracy for epoch {} is ".format(epoch), tf.reduce_mean(val_accuracies).eval())
-                    validation_accuracies.append(tf.reduce_mean(val_accuracies).eval())
+                    if store_accuracies:
+                        validation_accuracies.append(tf.reduce_mean(val_accuracies).eval())
                     break
 
         end_time = time.time()
         total_time = end_time - start_time
         print("Finished training network.")
         print("Time to train network: {}s".format(total_time))
-        pickle.dump((training_accuracies, validation_accuracies), open( "accuracies.p", "wb" ) )
+        if store_accuracies:
+            pickle.dump((training_accuracies, validation_accuracies), open( "accuracies.p", "wb" ) )
         print("Pickled Accuracies")
 
         if save:
@@ -199,7 +217,7 @@ class data_pipeline(object):
         """
         self.features_placeholder = tf.placeholder(tf.int32)
         self.labels_placeholder = tf.placeholder(tf.int32)
-
+        self.batch_size = batch_size
         self.dataset = tf.data.Dataset.from_tensor_slices((self.features_placeholder, self.labels_placeholder))
 
         #Train input pipeline
